@@ -41,7 +41,7 @@ function Trainer:train(epoch, dataloader)
    end
 
    local trainSize = dataloader:size()
-   local top1Sum, top5Sum, lossSum = 0.0, 0.0, 0.0
+   local lossSum = 0.0
    local N = 0
 
    print('=> Training epoch # ' .. epoch)
@@ -59,8 +59,7 @@ function Trainer:train(epoch, dataloader)
       print('Target value is ')
       print(self.target)
       local loss = self.criterion:forward(self.model.output, self.target)
-      print('Loss value is ' .. loss)
-      
+      print('Loss value of current Batch in Training is ' .. loss) 
 
       self.model:zeroGradParameters()
       self.criterion:backward(self.model.output, self.target)
@@ -68,24 +67,25 @@ function Trainer:train(epoch, dataloader)
 
       optim.sgd(feval, self.params, self.optimState)
 
+      lossSum = lossSum + loss
+      N = N + 1
+
       -- check that the storage didn't get changed do to an unfortunate getParameters call
       assert(self.params:storage() == self.model:parameters()[1]:storage())
 
       timer:reset()
       dataTimer:reset()
    end
-
+   return lossSum / N
 end
 
 function Trainer:test(epoch, dataloader)
-   -- Computes the top-1 and top-5 err on the validation set
+   -- Computes the err on the validation set
 
    local timer = torch.Timer()
    local dataTimer = torch.Timer()
    local size = dataloader:size()
-
-   local nCrops = self.opt.tenCrop and 10 or 1
-   local top1Sum, top5Sum = 0.0, 0.0
+   local lossSum = 0.0
    local N = 0
 
    self.model:evaluate()
@@ -97,11 +97,21 @@ function Trainer:test(epoch, dataloader)
 
       local output = self.model:forward(self.input):float()
       local loss = self.criterion:forward(self.model.output, self.target)
+      print('Loss value of current Batch in Validation is ' .. loss) 
+
+      lossSum = lossSum + loss
+      N = N + 1
+
+      print((' | Test: [%d][%d/%d]    Time %.3f  Data %.3f '):format(
+         epoch, n, size, timer:time().real, dataTime))
 
       timer:reset()
       dataTimer:reset()
    end
    self.model:training()
+   print((' * Finished epoch # %d \n'):format(
+      epoch))
+   return lossSum / N
 end
 
 function Trainer:copyInputs(sample)
