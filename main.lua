@@ -36,32 +36,36 @@ local trainLoader, valLoader = DataLoader.create(opt)
 local trainer = Trainer(model, criterion, opt, optimState)
 
 if opt.testOnly then
-   local valLoss = trainer:test(0, valLoader)
-   print(string.format(' * Results validation loss: %6.3f ', bestValLoss))
+   local valLossMSE, valLossAbs = trainer:test(0, valLoader)
+   print(string.format(' * Validation Results: MSE loss is %6.3f, Average Absolute loss is %6.3f ', bestValLoss, valLossAbs))
    return
 end
 
 local startEpoch = checkpoint and checkpoint.epoch + 1 or opt.epochNumber
 local bestValLoss = math.huge
+-- we also store the absLoss corresponding to the best mse validation loss
+local absLoss = math.huge
 local bestEpoch = 1
 for epoch = startEpoch, opt.nEpochs do
    -- Train for a single epoch
    local trainLoss = trainer:train(epoch, trainLoader)
 
    -- Run model on validation set
-   local valLoss = trainer:test(epoch, valLoader)
-   print(' * Full Validation Loss on entire Validation set is ' .. valLoss)
+   local valLossMSE, valLossAbs = trainer:test(epoch, valLoader)
+   print(' * MSE Validation Loss on entire Validation set is ' .. valLossMSE)
+   print(' * Absolute Validation Loss on entire Validation set is ' .. valLossAbs)
 
    local bestModel = false
-   if valLoss < bestValLoss then
+   if valLossMSE < bestValLoss then
       bestModel = true
-      bestValLoss = valLoss
+      bestValLoss = valLossMSE
+      absLoss = valLossAbs
       bestEpoch = epoch
       print(' * Best model until now is obtained at epoch # ' .. 
-      epoch .. ' and has a validation loss of ' .. valLoss)
+      epoch .. ' and has an MSE validation loss of ' .. valLossMSE .. ' and Absolute Validation loss of ' .. valLossAbs)
    end
 
    checkpoints.save(epoch, model, trainer.optimState, bestModel)
 end
 
-print(string.format(' * Finished best validation loss is: %6.3f and occurs at epoch#', bestValLoss, bestEpoch))
+print(string.format(' * Finished best MSE Validation loss is: %6.3f and occurs at epoch # %6.3f, and the corresponding Absolute Validation loss is %6.3f', bestValLoss, bestEpoch, absLoss))

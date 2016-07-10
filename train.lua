@@ -76,6 +76,7 @@ function Trainer:train(epoch, dataloader)
       timer:reset()
       dataTimer:reset()
    end
+	-- return the MSE and Average Absolute Loss
    return lossSum / N
 end
 
@@ -86,6 +87,7 @@ function Trainer:test(epoch, dataloader)
    local dataTimer = torch.Timer()
    local size = dataloader:size()
    local lossSum = 0.0
+   local absLossSum = 0.0
    local N = 0
 
    self.model:evaluate()
@@ -96,10 +98,20 @@ function Trainer:test(epoch, dataloader)
       self:copyInputs(sample)
 
       local output = self.model:forward(self.input):float()
+      -- find MSE 
       local loss = self.criterion:forward(self.model.output, self.target)
-      print('Loss value of current Batch in Validation is ' .. loss) 
+      -- find absolute error
+      -- self.target is cuda tensor and is converted to torch float tensor
+      local absLoss = torch.sum(torch.abs(output - torch.FloatTensor(self.target:size()):copy(self.target)))       
+      print('Validation batch output is ')
+      print(output)
+      print('Validation target is ')
+      print(self.target)
+      print('MSE Loss value of current Batch in Validation is ' .. loss)
+      print('Absolute Loss value of current Batch in Validation is ' .. absLoss)
 
       lossSum = lossSum + loss
+      absLossSum = absLossSum + absLoss
       N = N + 1
 
       print((' | Test: [%d][%d/%d]    Time %.3f  Data %.3f '):format(
@@ -111,7 +123,7 @@ function Trainer:test(epoch, dataloader)
    self.model:training()
    print((' * Finished epoch # %d \n'):format(
       epoch))
-   return lossSum / N
+   return lossSum / N, absLossSum / N
 end
 
 function Trainer:copyInputs(sample)
